@@ -25,23 +25,20 @@ export class ResizableArray {
   }
 
   private saveMetadata() {
-    const view = new DataView(this._allocator.buffer, this._block.offset);
-    view.setUint32(0, this._length);
-    view.setUint32(4, this._capacity);
+    this._allocator.view.setUint32(this._block.offset, this._length);
+    this._allocator.view.setUint32(this._block.offset + 4, this._capacity);
   }
 
   private loadMetadata() {
-    const view = new DataView(this._allocator.buffer, this._block.offset);
-    this._length = view.getUint32(0);
-    this._capacity = view.getUint32(4);
+    this._length = this._allocator.view.getUint32(this._block.offset);
+    this._capacity = this._allocator.view.getUint32(this._block.offset + 4);
   }
 
   public push(value: number) {
     if (this._length >= this._capacity) {
       this.resize();
     }
-    const view = new DataView(this._allocator.buffer, this._block.offset + 8);
-    view.setUint32(this._length * 4, value);
+    this._allocator.view.setUint32(this._block.offset + 8 + this._length * 4, value);
     this._length++;
     this.saveMetadata();
   }
@@ -49,11 +46,11 @@ export class ResizableArray {
   private resize() {
     const newCapacity = this._capacity * 2;
     const newBlock = this._allocator.allocate(8 + newCapacity * 4);
-    const oldView = new DataView(this._allocator.buffer, this._block.offset + 8, this._capacity * 4);
-    const newView = new DataView(this._allocator.buffer, newBlock.offset + 8, newCapacity * 4);
-    for (let i = 0; i < this._capacity; i++) {
-      newView.setUint32(i * 4, oldView.getUint32(i * 4));
-    }
+
+    const oldView = new Uint8Array(this._allocator.buffer, this._block.offset + 8, this._capacity * 4);
+    const newView = new Uint8Array(this._allocator.buffer, newBlock.offset + 8, newCapacity * 4);
+    newView.set(oldView);
+
     this._allocator.free(this._block);
     this._capacity = newCapacity;
     this._block = newBlock;
@@ -64,8 +61,8 @@ export class ResizableArray {
     if (index >= this._length) {
       throw new Error('Index out of bounds');
     }
-    const view = new DataView(this._allocator.buffer, this._block.offset + 8);
-    return view.getUint32(index * 4);
+
+    return this._allocator.view.getUint32(this._block.offset + 8 + index * 4);
   }
 
   public restore(offset: number) {
